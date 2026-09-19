@@ -1,0 +1,83 @@
+name: Login Account
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Email du compte"
+        required: true
+        type: string
+      password:
+        description: "Mot de passe"
+        required: true
+        type: string
+      platform:
+        description: "Plateforme (ex: freetron)"
+        required: true
+        type: string
+      userId:
+        description: "USER_ID"
+        required: true
+        type: string
+      proxyIndex:
+        description: "Index du proxy"
+        required: false
+        type: string
+        default: "0"
+      initialTimer:
+        description: "Timer initial (ex: 60:00)"
+        required: false
+        type: string
+        default: "60:00"
+      action:
+        description: "Action (login)"
+        required: false
+        type: string
+        default: "login"
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    container:
+      image: ghcr.io/aliya123-pro/camoufox-system:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      # Masque le mot de passe sans l'afficher dans la commande
+      - name: Masquer le mot de passe
+        env:
+          MASK_PASSWORD: ${{ github.event.inputs.password }}
+        run: echo "::add-mask::$MASK_PASSWORD"
+
+      - name: Exécuter le script de login
+        working-directory: /app
+        env:
+          HOME: /home/camoxuser
+          DISPLAY: ":99"
+          TEST_EMAIL: ${{ github.event.inputs.email }}
+          TEST_PASSWORD: ${{ github.event.inputs.password }}
+          TEST_PLATFORM: ${{ github.event.inputs.platform }}
+          TEST_PROXY_INDEX: ${{ github.event.inputs.proxyIndex || '0' }}
+          TEST_INITIAL_TIMER: ${{ github.event.inputs.initialTimer || '60:00' }}
+          USER_ID: ${{ github.event.inputs.userId }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          GH_BRANCH: ${{ secrets.GH_BRANCH || 'main' }}
+          JP_PROXY_LIST: ${{ secrets.JP_PROXY_LIST }}
+          CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
+        run: |
+          mkdir -p /app/videos
+          xvfb-run --auto-servernum python test_login_workflow.py
+
+      - name: Upload des vidéos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-video-${{ github.run_id }}
+          path: /app/videos/
+          retention-days: 5
+          if-no-files-found: warn
